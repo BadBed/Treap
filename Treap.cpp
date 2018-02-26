@@ -3,8 +3,9 @@
 #include <algorithm>
 #include <cassert>
 #include <iostream>
-#include "pch.h"
-#include "Treap.h"
+//#include "pch.h"
+//#include "Treap.h"
+
 
 using std::cin;
 using std::cout;
@@ -19,9 +20,9 @@ public:
 	CNode<T> *left, *right;
 	size_t size;
 
-	CNode ();
-	explicit CNode (T);
-	~CNode () {}
+	CNode();
+	explicit CNode(T);
+	~CNode();
 };
 
 template <typename T>
@@ -29,33 +30,33 @@ class CTreap {
 private:
 	CNode<T>* root_;
 
-	static void DeleteNodes (CNode<T>* node);
-	static void Update (CNode<T>* node);
-	static void Push (CNode<T>* node);
+	static void DeleteNodes(CNode<T>* node);
+	static void Update(CNode<T>* node);
+	static void Push(CNode<T>* node);
 
 	static CNode<T>* Find(CNode<T>* node, size_t pos);
 	static CNode<T>* Merge(CNode<T>* first, CNode<T>* second);
 	static pair<CNode<T>*, CNode<T>* > Split(CNode<T>* root, size_t count);
 	// <k, >=k
 
-	static size_t GetSize (const CNode<T>* node);
+	static size_t GetSize(const CNode<T>* node);
 
-	static void Print (CNode<T>* node);
+	static void Print(CNode<T>* node);
+	static void UpdateAll(CNode<T>* node);
 
 public:
-	CTreap():root_(nullptr) {}
+	CTreap();
 	CTreap(const T* array, const T* end);
-	~CTreap() { DeleteNodes(root_); }
+	~CTreap();
 
-	size_t Size() { return GetSize(root_); }
+	size_t Size();
 
 	void Insert(T key, size_t pos);
 	void Delete(size_t pos);
 	T operator[](size_t k) const;
 	void ToBegin(size_t l, size_t r);
 
-
-	void Print ();
+	void Print();
 };
 
 //###################################################################
@@ -76,6 +77,25 @@ CNode<T>::CNode(T key):
 	right(nullptr),
 	size(1) {}
 
+template <typename T>
+CNode<T>::~CNode() {}
+
+//----------------------------------------------------------------------
+
+template <typename T>
+CTreap<T>::CTreap() {
+	root_ = nullptr;
+}
+
+template <typename T>
+CTreap<T>::~CTreap() {
+	DeleteNodes(root_);
+}
+
+template <typename T>
+size_t CTreap<T>::Size() {
+	return GetSize(root_);
+} 
 
 //----------------------------------------------------------------------
 
@@ -144,8 +164,10 @@ CTreap<T>::CTreap (const T* array, const T* end) {
 			right_way.back()->right = new_node;
 			new_node->left = just_popped;
 		}
-		right_way.back();
+		right_way.push_back(new_node);
 	}
+
+	UpdateAll(root_);
 }
 
 template <typename T>
@@ -240,7 +262,7 @@ template <typename T>
 void CTreap<T>::ToBegin(size_t l, size_t r) {
 	++r;
 	auto pair1_23 = Split(root_, l);
-	auto pair2_3 = Split(p.second, r - l);
+	auto pair2_3 = Split(pair1_23.second, r - l);
 	auto seg12 = Merge(pair2_3.first, pair1_23.first);
 	root_ = Merge(seg12, pair2_3.second);
 }
@@ -263,14 +285,24 @@ void CTreap<T>::Print(CNode<T>* node) {
 	Print(node->right);
 }
 
+template <typename T>
+void CTreap<T>::UpdateAll(CNode<T>* node) {
+	if (node == nullptr)
+		return;
+
+	UpdateAll(node->left);
+	UpdateAll(node->right);
+	Update(node);
+}
+
 //#################################################################################
 
-int solution() {
+void solution() {
 	int n, m;
 	cin >> n >> m;
 	int* array = new int[n];
 	for (int i = 0; i < n; ++i)
-		cin >> array[i];
+		array[i] = i+1;
 
 	CTreap<int> treap(array, array + n);
 
@@ -283,10 +315,9 @@ int solution() {
 	treap.Print();
 
 	delete[] array;
-	return 0;
 }
-/*
+
 int main() {
-	return solution();
+	solution();
+	//system("pause");
 }
-*/

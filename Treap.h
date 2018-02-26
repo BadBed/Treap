@@ -8,7 +8,17 @@
 using std::pair;
 
 template <typename T>
-class CNode;
+class CNode {
+public:
+	T key;
+	int priority;
+	CNode<T> *left, *right;
+	size_t size;
+
+	CNode ();
+	explicit CNode (T);
+	~CNode();
+};
 
 template <typename T>
 class CTreap {
@@ -27,6 +37,8 @@ private:
 	static size_t GetSize(const CNode<T>* node);
 
 	static void Print(CNode<T>* node);
+	static void UpdateAll (CNode<T>* node);
+	
 public:
 	CTreap();
 	CTreap(const T* array, const T* end);

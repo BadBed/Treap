@@ -15,7 +15,7 @@ using std::to_string;
 using std::cout;
 using std::max;
 using std::set;
-
+/*
 TEST(manual, construct) {
 	int* a = new int[9];
 	for (int i = 0; i < 9; ++i)
@@ -59,7 +59,7 @@ TEST(manual, to_begin) {
 	EXPECT_EQ(a[3], 5);
 	EXPECT_EQ(a[4], 0);
 }
-
+*/
 //############################################################################
 /*
 enum CEventType {INSERT = 0, DELETE, KTH, EXIST, COUNT_OF_TYPES};
@@ -180,10 +180,11 @@ TEST (auto_test, small) {
 		}
 	}
 }*/
-
+/*
 int main(int argc, char **argv) {
 	::testing::InitGoogleTest(&argc, argv);
 	int r = RUN_ALL_TESTS();
 	system("pause");
 	return r;
 }
+*/
