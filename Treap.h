@@ -10,6 +10,10 @@ using std::cin;
 using std::cout;
 using std::pair;
 using std::make_pair;
+using std::swap;
+
+typedef unsigned int uint;
+typedef long long lint;
 
 template <typename T>
 class CNode {
@@ -18,12 +22,31 @@ public:
 	int priority;
 	CNode<T> *left, *right;
 	size_t size;
-	T add, sum;
+	T add, sum, assign;
+	bool is_assign, is_reverse;
+	T leftist, rightist;
+	size_t inc_suff, dec_suff;
+	size_t inc_pref, dec_pref;
 
 	CNode();
 	explicit CNode(T);
 	~CNode();
 };
+
+//-----------------------------------------------------------------
+
+template <typename T>
+class CSlicer {
+public:
+	CNode<T>* first;
+	CNode<T>* second;
+	CNode<T>* third;
+
+	CSlicer(CNode<T>* node, size_t l, size_t r);
+	CNode<T>* Repair();
+};
+
+//-----------------------------------------------------------------
 
 template <typename T>
 class CTreap {
@@ -41,12 +64,22 @@ private:
 
 	static size_t GetSize(const CNode<T>* node);
 	static T GetSum(const CNode<T>* node);
+	static size_t GetIncSuff(const CNode<T>* node);
+	static size_t GetDecSuff(const CNode<T>* node);
+	static size_t GetIncPref(const CNode<T>* node);
+	static size_t GetDecPref(const CNode<T>* node);
 
 	static void SetAdd(CNode<T>* node, T add);
+	static void SetAssign(CNode<T>* node, T value);
+	static void SetReverse(CNode<T>* node);
+
+	static int SucInDec(CNode<T>* node, T value);
+	static int PredInInc(CNode<T>* node, T value);
 
 	static void Print(CNode<T>* node);
 	static void UpdateAll(CNode<T>* node);
 
+	friend class CSlicer<T>;
 public:
 	CTreap();
 	CTreap(const T* array, const T* end);
@@ -56,9 +89,24 @@ public:
 
 	void Insert(T key, size_t pos);
 	void Delete(size_t pos);
-	T operator[](size_t k) const;
+	
 	void Add(T add, size_t l, size_t r);
+	void Assign(T value, size_t l, size_t r);
+	void Reverse(size_t l, size_t r);
 	T Sum(size_t l, size_t r);
+	void NextPermutation(size_t l, size_t r);
+	void PrevPermutation(size_t l, size_t r);
+
+	T operator[](size_t k) const;
+	T First() const { return root_->leftist; }
+	T Last() const { return root_->rightist; }
+	size_t IncSuff() const { return GetIncSuff(root_); }
+	size_t DecSuff() const { return GetDecSuff(root_); }
+	size_t DecPref() const { return GetDecPref(root_); }
+	size_t IncPref() const { return GetIncPref(root_); }
+	int SucDec(T value) { return SucInDec(root_, value); }
+	int PredInc(T value) { return PredInInc(root_, value); }
+	void Swap(size_t pos1, size_t pos2);
 
 	void Print();
 };
@@ -78,7 +126,16 @@ CNode<T>::CNode(T key):
 	right(nullptr),
 	size(1),
 	add(0),
-	sum(key) {}
+	sum(key),
+	assign(0),
+	is_assign(false),
+	is_reverse(false),
+	leftist(key),
+	rightist(key),
+	inc_suff(1),
+	dec_suff(1),
+	inc_pref(1),
+	dec_pref(1) {}
 
 template <typename T>
 CNode<T>::~CNode() {}
@@ -100,6 +157,24 @@ size_t CTreap<T>::Size() {
 	return GetSize(root_);
 } 
 
+//---------------------------------------------------------------------
+
+template <typename T>
+CSlicer<T>::CSlicer(CNode<T>* node, size_t l, size_t r) {
+	++r;
+	auto pair1_23 = CTreap<T>::Split(node, l);
+	auto pair2_3 = CTreap<T>::Split(pair1_23.second, r - l);
+	first = pair1_23.first;
+	second = pair2_3.first;
+	third = pair2_3.second;
+}
+
+template <typename T>
+CNode<T>* CSlicer<T>::Repair() {
+	CNode<T>* nodes12 = CTreap<T>::Merge(first, second);
+	return CTreap<T>::Merge(nodes12, third);
+}
+
 //----------------------------------------------------------------------
 
 template <typename T>
@@ -119,6 +194,49 @@ void CTreap<T>::Update (CNode<T>* node) {
 
 	node->size = GetSize(node->left) + GetSize(node->right) + 1;
 	node->sum = GetSum(node->left) + GetSum(node->right) + node->key;
+
+	node->leftist = node->left == nullptr ? node->key : node->left->leftist;
+	node->rightist = node->right == nullptr ? node->key : node->right->rightist;
+
+	if (node->right == nullptr || (node->key <= node->right->leftist &&
+				node->right->inc_suff == node->right->size)) {
+		node->inc_suff = GetSize(node->right) + 1;
+		if (node->left != nullptr && node->left->rightist <= node->key)
+			node->inc_suff += node->left->inc_suff;
+	}
+	else {
+		node->inc_suff = GetIncSuff(node->right);
+	}
+
+	if (node->right == nullptr || (node->key >= node->right->leftist &&
+				node->right->dec_suff == node->right->size)) {
+		node->dec_suff = GetSize(node->right) + 1;
+		if (node->left != nullptr && node->left->rightist >= node->key)
+			node->dec_suff += node->left->dec_suff;
+	}
+	else {
+		node->dec_suff = GetDecSuff(node->right);
+	}
+
+	if (node->left == nullptr || (node->key >= node->left->rightist &&
+				node->left->inc_pref == node->left->size)) {
+		node->inc_pref = GetSize(node->left) + 1;
+		if (node->right != nullptr && node->right->leftist >= node->key)
+			node->inc_pref += node->right->inc_pref;
+	}
+	else {
+		node->inc_pref = GetIncPref(node->left);
+	}
+
+	if (node->left == nullptr || (node->key <= node->left->rightist &&
+				node->left->dec_pref == node->left->size)) {
+		node->dec_pref = GetSize(node->left) + 1;
+		if (node->right != nullptr && node->right->leftist <= node->key)
+			node->dec_pref += node->right->dec_pref;
+	}
+	else {
+		node->dec_pref = GetDecPref(node->left);
+	}
 }
 
 template <typename T>
@@ -126,9 +244,23 @@ void CTreap<T>::Push (CNode<T>* node) {
 	if (node == nullptr)
 		return;
 
-	SetAdd(node->left, node->add);
-	SetAdd(node->right, node->add);
-	node->add = 0;
+	if (node->is_reverse) {
+		SetReverse(node->left);
+		SetReverse(node->right);
+		node->is_reverse = false;
+	}
+
+	if (node->is_assign) {
+		assert(node->add == 0);
+		SetAssign(node->left, node->assign);
+		SetAssign(node->right, node->assign);
+		node->is_assign = false;
+	}
+	else {
+		SetAdd(node->left, node->add);
+		SetAdd(node->right, node->add);
+		node->add = 0;
+	}
 }
 
 //--------------------------------------------------------------------
@@ -142,6 +274,38 @@ size_t CTreap<T>::GetSize (const CNode<T>* node) {
 }
 
 template <typename T>
+size_t CTreap<T>::GetIncSuff (const CNode<T>* node) {
+	if (node == nullptr)
+		return 0;
+	else
+		return node->inc_suff;
+}
+
+template <typename T>
+size_t CTreap<T>::GetDecSuff (const CNode<T>* node) {
+	if (node == nullptr)
+		return 0;
+	else
+		return node->dec_suff;
+}
+
+template <typename T>
+size_t CTreap<T>::GetDecPref (const CNode<T>* node) {
+	if (node == nullptr)
+		return 0;
+	else
+		return node->dec_pref;
+}
+
+template <typename T>
+size_t CTreap<T>::GetIncPref (const CNode<T>* node) {
+	if (node == nullptr)
+		return 0;
+	else
+		return node->inc_pref;
+}
+
+template <typename T>
 T CTreap<T>::GetSum (const CNode<T>* node) {
 	if (node == nullptr)
 		return 0;
@@ -149,13 +313,98 @@ T CTreap<T>::GetSum (const CNode<T>* node) {
 		return node->sum;
 }
 
+//---------------------------------------------------------------------
+
+template <typename T>
+void CTreap<T>::SetAssign (CNode<T>* node, T value) {
+	if (node == nullptr)
+		return;
+
+	node->key = value;
+	node->assign = value;
+	node->is_assign = true;
+	node->add = 0;
+	node->sum = value * node->size;
+	node->leftist = value;
+	node->rightist = value;
+	node->inc_suff = node->size;
+	node->dec_suff = node->size;
+	node->inc_pref = node->size;
+	node->dec_pref = node->size;
+}
+
 template <typename T>
 void CTreap<T>::SetAdd (CNode<T>* node, T add) {
 	if (node == nullptr)
 		return;
 
-	node->add += add;
 	node->key += add;
+	node->sum += add * node->size;
+	node->leftist += add;
+	node->rightist += add;
+	if (node->is_assign) {
+		node->assign += add;
+	}
+	else {
+		node->add += add;
+	}
+}
+
+template <typename T>
+void CTreap<T>::SetReverse (CNode<T>* node) {
+	if (node == nullptr)
+		return;
+
+	swap(node->left, node->right);
+	swap(node->leftist, node->rightist);
+	swap(node->inc_pref, node->dec_suff);
+	swap(node->inc_suff, node->dec_pref);
+	node->is_reverse = node->is_reverse ? false : true;
+}
+
+//-------------------------------------------------------------------
+
+template <typename T>
+int CTreap<T>::SucInDec(CNode<T>* node, T value) {
+	if (node == nullptr)
+		return -1;
+
+	Push(node);
+	assert(GetSize(node) == GetDecSuff(node));
+
+	if (node->key <= value) {
+		return SucInDec(node->left, value);
+	}
+	else {
+		return SucInDec(node->right, value) + 1 + GetSize(node->left);
+	}
+}
+
+template <typename T>
+int CTreap<T>::PredInInc(CNode<T>* node, T value) {
+	if (node == nullptr)
+		return -1;
+
+	Push(node);
+	assert(GetSize(node) == GetIncSuff(node));
+
+	if (node->key >= value) {
+		return PredInInc(node->left, value);
+	}
+	else {
+		return PredInInc(node->right, value) + 1 + GetSize(node->left);
+	}
+}
+
+template <typename T>
+void CTreap<T>::Swap(size_t pos1, size_t pos2) {
+	T key1 = operator[](pos1);
+	T key2 = operator[](pos2);
+
+	Delete(pos1);
+	Insert(key2, pos1);
+	Delete(pos2);
+	Insert(key1, pos2);
 }
 
 //--------------------------------------------------------------------
@@ -287,23 +536,79 @@ T CTreap<T>::operator[](size_t k) const {
 
 template <typename T>
 void CTreap<T>::Add(T add, size_t l, size_t r) {
-	++r;
-	auto pair1_23 = Split(root_, l);
-	auto pair2_3 = Split(pair1_23.second, r - l);
-	SetAdd(pair2_3.first, add);
-	pair1_23.second = Merge(pair2_3.first, pair2_3.second);
-	root_ = Merge(pair1_23.first, pair1_23.second);
+	CSlicer<T> slicer(root_, l, r);
+	SetAdd(slicer.second, add);
+	root_ = slicer.Repair();
+}
+
+template <typename T>
+void CTreap<T>::Assign(T value, size_t l, size_t r) {
+	CSlicer<T> slicer(root_, l, r);
+	SetAssign(slicer.second, value);
+	root_ = slicer.Repair();
+}
+
+template <typename T>
+void CTreap<T>::Reverse(size_t l, size_t r) {
+	CSlicer<T> slicer(root_, l, r);
+	SetReverse(slicer.second);
+	root_ = slicer.Repair();
 }
 
 template <typename T>
 T CTreap<T>::Sum(size_t l, size_t r) {
-	++r;
-	auto pair1_23 = Split(root_, l);
-	auto pair2_3 = Split(pair1_23.second, r - l);
-	T result = GetSum(pair2_3.first);
-	pair1_23.second = Merge(pair2_3.first, pair2_3.second);
-	root_ = Merge(pair1_23.first, pair1_23.second);
+	CSlicer<T> slicer(root_, l, r);
+	T result = GetSum(slicer.second);
+	root_ = slicer.Repair();
 	return result;
+}
+
+template <typename T>
+void CTreap<T>::NextPermutation(size_t l, size_t r) {
+	CSlicer<T> slicer(root_, l, r);
+	size_t unsorted = GetSize(slicer.second) - GetDecSuff(slicer.second);
+	auto p = Split(slicer.second, unsorted);
+	if (p.first == nullptr) {
+		SetReverse(p.second);
+	}
+	else {
+		size_t i = SucInDec(p.second, p.first->rightist);
+		CSlicer<T> slicer2(p.second, i, i);
+		auto p2 = Split(p.first, GetSize(p.first) - 1);
+
+		swap(p2.second, slicer2.second);
+
+		p.first = Merge(p2.first, p2.second);
+		p.second = slicer2.Repair();
+
+		SetReverse(p.second);
+	}
+	slicer.second = Merge(p.first, p.second);
+	root_ = slicer.Repair();
+}
+
+template <typename T>
+void CTreap<T>::PrevPermutation(size_t l, size_t r) {
+	CSlicer<T> slicer(root_, l, r);
+	size_t unsorted = GetSize(slicer.second) - GetIncSuff(slicer.second);
+	auto p = Split(slicer.second, unsorted);
+	if (p.first == nullptr) {
+		SetReverse(p.second);
+	}
+	else {
+		size_t i = PredInInc(p.second, p.first->rightist);
+		CSlicer<T> slicer2(p.second, i, i);
+		auto p2 = Split(p.first, GetSize(p.first) - 1);
+
+		swap(p2.second, slicer2.second);
+
+		p.first = Merge(p2.first, p2.second);
+		p.second = slicer2.Repair();
+
+		SetReverse(p.second);
+	}
+	slicer.second = Merge(p.first, p.second);
+	root_ = slicer.Repair();
 }
 
 //---------------------------------------------------------------------------------
@@ -318,9 +623,9 @@ template <typename T>
 void CTreap<T>::Print(CNode<T>* node) {
 	if (node == nullptr)
 		return;
-
+	Push(node);
 	Print(node->left);
-	cout << "(" << node->key << ", " << node->size << ") ";
+	cout << node->key << " ";
 	Print(node->right);
 }
 
@@ -337,11 +642,61 @@ void CTreap<T>::UpdateAll(CNode<T>* node) {
 //#################################################################################
 
 void solution() {
+	uint n;
+	cin >> n;
+	lint* a = new lint[n];
+	for (int i = 0; i < n; ++i)
+		cin >> a[i];
 
+	CTreap<lint> treap(a, a + n);
+	uint q;
+	cin >> q;
+	for (int i = 0; i < q; ++i) {
+		uint type;
+		cin >> type;
+		if (type == 1) {
+			uint l, r;
+			cin >> l >> r;
+			cout << treap.Sum(l, r) << "\n";
+		}
+		else if (type == 2) {
+			uint i;
+			lint value;
+			cin >> value >> i;
+			treap.Insert(value, i);
+		}
+		else if (type == 3) {
+			uint i;
+			cin >> i;
+			treap.Delete(i);
+		}
+		else if (type == 4) {
+			uint l, r;
+			lint x;
+			cin >> x >> l >> r;
+			treap.Assign(x, l, r);
+		}
+		else if (type == 5) {
+			uint l, r;
+			lint x;
+			cin >> x >> l >> r;
+			treap.Add(x, l, r);
+		}
+		else if (type == 6) {
+			uint l, r;
+			cin >> l >> r;
+			treap.NextPermutation(l, r);
+		}
+		else if (type == 7) {
+			uint l, r;
+			cin >> l >> r;
+			treap.PrevPermutation(l, r);
+		}
+	}
+	treap.Print();
 }
-/*
+
 int main() {
 	solution();
-	//system("pause");
+	system("pause");
 }
-*/
