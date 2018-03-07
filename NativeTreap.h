@@ -1,36 +1,64 @@
 #pragma once
-#include <set>
-#include <map>
+#include <vector>
+#include <algorithm>
 
-template <typename T>
 class CNative {
 private:
-	std::map<T, T> a;
+	std::vector<bool> arr;
 public:
+	CNative(lint size) { arr = std::vector<bool>(size, true);  }
 
-	void Delete(T key) { a.erase(key); }
-	bool Exist(T key) const { return a.count(key) != 0; }
-	void Insert(T key, T value) {
-		if (!Exist(key))
-			a[key] = value;
-	}
-	
-	T Max() const {
-		T result = a.begin()->second;
-		for (auto it = a.begin(); it != a.end(); ++it) {
-			result = max(result, it->second);
+	void Free(lint l, lint r) {
+		for (lint i = l; i < r; ++i) {
+			arr[i] = true;
 		}
-		return result;
 	}
-	T KeyOfMax() const {
-		T vmax = a.begin()->second;
-		T result = a.begin()->first;
-		for (auto it = a.begin(); it != a.end(); ++it) {
-			if (it->second > vmax) {
-				vmax = it->second;
-				result = it->first;
+
+	void Reserve(lint l, lint r) {
+		for (lint i = l; i < r; ++i) {
+			arr[i] = false;
+		}
+	}
+
+	lint BestPos() {
+		lint best = 0;
+		lint now = 0;
+		lint pos = 0;
+		for (lint i = 0; i < arr.size(); ++i) {
+			if (arr[i]) {
+				now++;
+			}
+			else {
+				now = 0;
+			}
+
+			if (now > best) {
+				best = now;
+				pos = i;
 			}
 		}
-		return result;
+
+		return best == 0 ? 0 : pos + 1 - best;
+	}
+
+	lint BestSize() {
+		lint best = 0;
+		lint now = 0;
+		lint pos = 0;
+		for (lint i = 0; i < arr.size(); ++i) {
+			if (arr[i]) {
+				now++;
+			}
+			else {
+				now = 0;
+			}
+
+			if (now > best) {
+				best = now;
+				pos = i;
+			}
+		}
+
+		return best;
 	}
 };

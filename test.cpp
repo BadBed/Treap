@@ -16,127 +16,128 @@ using std::cout;
 using std::max;
 using std::set;
 
-typedef unsigned int uint;
-
-TEST(manual, smth) {
-	CTreap<uint> t;
-	t.Insert(3, 10);
-	t.Insert(5, 10);
-	t.Insert(4, 10);
-	t.Delete(4);
-	EXPECT_EQ(t.Kth(0), 3);
-	EXPECT_EQ(t.Kth(1), 5);
+TEST(manual, construct) {
+	lint size = 6;
+	CTree t(size);
+	EXPECT_EQ(t.BestSize(), size);
+	EXPECT_EQ(t.BestPos(), 0);
 }
 
-TEST(manual, big_value) {
-	CTreap<uint> t;
-	t.Insert(1e9, 10);
-	t.Insert(123456, 10);
-	t.Delete(1e9);
-	EXPECT_EQ(t.Kth(0), 123456);
-	EXPECT_TRUE(t.Exist(123456));
-	EXPECT_TRUE(t.Exist(123456));
-	EXPECT_FALSE(t.Exist(1e9));
+TEST(manual, reserve) {
+	lint size = 6;
+	CTree t(size);
+	t.Reserve(0, 3);
+	EXPECT_EQ(t.BestPos(), 3);
+	EXPECT_EQ(t.BestSize(), 3);
 }
 
-TEST(manual, max) {
-	CTreap<uint> t;
-	t.Insert(3, 4);
-	t.Insert(1, 100);
-	t.Insert(2, 1);
-	EXPECT_EQ(t.Max(), 100);
-	EXPECT_EQ(t.KeyOfMax(), 1);
+TEST(manual, equial_bests) {
+	lint size = 7;
+	CTree t(size);
+	t.Reserve(3, 5);
+	t.Reserve(0, 1);
+	EXPECT_EQ(t.BestPos(), 1);
+	EXPECT_EQ(t.BestSize(), 2);
 }
 
-TEST(native, max) {
-	CTreap<uint> t;
-	t.Insert(3, 4);
-	t.Insert(1, 100);
-	t.Insert(2, 1);
-	EXPECT_EQ(t.Max(), 100);
-	EXPECT_EQ(t.KeyOfMax(), 1);
+TEST(manual, free) {
+	lint size = 8;
+	CTree t(size);
+	t.Reserve(3, 5);
+	t.Free(3, 4);
+	EXPECT_EQ(t.BestPos(), 0);
+	EXPECT_EQ(t.BestSize(), 4);
+}
+
+TEST(manual, big) {
+	lint size = 18;
+	CTree t(size);
+	t.Reserve(0, 9);
+}
+
+TEST(manual, fatal1) {
+	CTree t(7);
+	t.Free(0, 5);
+	t.Reserve(0, 3);
+	t.Free(5, 7);
+	t.Free(3, 5);
+	EXPECT_EQ(t.BestPos(), 3);
+	EXPECT_EQ(t.BestSize(), 4);
+}
+
+TEST(native, fatal1) {
+	CNative t(2);
+	t.Reserve(0, 1);
+	EXPECT_EQ(t.BestPos(), 1);
+	EXPECT_EQ(t.BestSize(), 1);
 }
 
 //############################################################################
-enum CEventType { INSERT = 0, DELETE, EXIST, MAX, KEY_OF_MAX, COUNT_OF_TYPES };
 
-class CEvent {
+enum CEventType {BEST_POS = 0, BEST_SIZE, FREE, RESERVE, COUNT_OF_TYPES};
+
+class CEvent{
 public:
 	CEventType type;
-	uint key, value;
+	size_t l, r;
 
-	CEvent(int max_key, size_t size) :
-		type(static_cast<CEventType>(rand() % COUNT_OF_TYPES)),
-		key((rand() % max_key) + 1),
-		value((rand() % max_key) + 1) {}
+	CEvent (size_t size) {
+		type = static_cast<CEventType>(rand() % COUNT_OF_TYPES);
+		r = (rand() % size) + 1;
+		l = rand() % r;
+	}
 
 	template<class TTreap>
 	int DoIt(TTreap&) const;
 
 	string Log() const;
 
-	bool IsCorrect(std::set<int>&) const;
+	bool IsCorrect() const;
 };
 
-string CEvent::Log() const {//!!!!!!!!!!!!!!!!
+string CEvent::Log() const {
 	string result = to_string(type) + " ";
-
-	if (type == INSERT) {
-		result += to_string(key) + " " + to_string(value);
+	
+	if (type == FREE || type == RESERVE) {
+		result += to_string(l) + " " + to_string(r);
 	}
-	if (type == DELETE || type == EXIST) {
-		result += to_string(key);
-	}
-
+	
 	result += "\n";
 	return result;
 }
 
-template<class TTreap>
-int CEvent::DoIt(TTreap& treap) const {//!!!!!!!!!!!!!!!!
-	if (type == INSERT) {
-		treap.Insert(key, value);
+template<class TTree>
+int CEvent::DoIt(TTree& tree) const {
+	if (type == FREE) {
+		tree.Free(l, r);
 	}
-	else if (type == DELETE) {
-		treap.Delete(key);
+	else if (type == RESERVE) {
+		tree.Reserve(l, r);
 	}
-	else if (type == EXIST) {
-		return treap.Exist(key) ? 0 : 1;
+	else if (type == BEST_SIZE) {
+		return tree.BestSize();
 	}
-	else if (type == MAX) {
-		return treap.Max();
-	}
-	else if (type == KEY_OF_MAX) {
-		return treap.KeyOfMax();
+	else if (type == BEST_POS) {
+		return tree.BestPos();
 	}
 	else {
 		assert(false);
 	}
+	
 	return 0;
 }
 
-bool CEvent::IsCorrect(std::set<int>& a) const {//!!!!!!!!!!!!!!!!
-	if (type == DELETE && a.count(key) == 0)
-		return false;
-	if ((type == MAX || type == KEY_OF_MAX) && a.empty())
-		return false;
-
-	if (type == INSERT)
-		a.insert(key);
-	if (type == DELETE)
-		a.erase(key);
-
+bool CEvent::IsCorrect() const {
 	return true;
 }
 
-vector<CEvent> GenEvents(size_t size, int max_key) {
-	set<int> s;
+vector<CEvent> GenEvents(size_t size, size_t count) {
 	vector<CEvent> events;
-
-	for (size_t i = 0; i < size; ++i) {
+	
+	for (size_t i = 0; i < count; ++i) {
 		while (true) {
-			CEvent new_event(max_key, s.size());
-			if (new_event.IsCorrect(s)) {
+			CEvent new_event(size);
+			if (new_event.IsCorrect()) {
 				events.push_back(new_event);
 				break;
 			}
@@ -146,47 +147,56 @@ vector<CEvent> GenEvents(size_t size, int max_key) {
 	return events;
 }
 
-bool test(size_t size, int max_key) {
-	vector<CEvent> events = GenEvents(size, max_key);
-	CTreap<uint> t1;
-	CNative<uint> t2;
+bool test(size_t max_size, size_t count) {
+	size_t size = (rand() % max_size) + 1;
+	vector<CEvent> events = GenEvents(size, count);
+	CTree t1(size);
+	CNative t2(size);
 
-	for (size_t i = 0; i < size; ++i) {
+	for (size_t i = 0; i < count; ++i) {
 		int r1 = events[i].DoIt(t1);
 		int r2 = events[i].DoIt(t2);
 		if (r1 != r2) {
-			EXPECT_EQ(r1, r2);
 			string log;
 			for (size_t j = 0; j <= i; ++j) {
 				log += events[j].Log();
 			}
+			cout << size << "\n";
 			cout << log;
+			EXPECT_EQ(r1, r2);
 			return false;
 		}
 	}
 	return true;
 }
 
-TEST(auto_test, small) {
-	for (size_t i = 0; i < 5e4; ++i) {
-		if (!test(10, 10)) {
+TEST (auto_test, all) {
+	for (size_t i = 0; i < 1e4; ++i) {
+		if(!test(10, 8)) {
 			cout << i << "\n";
 			ASSERT_TRUE(false);
 		}
-		if (i % 10000 == 0) {
-			cout << i / 10000 << " of 5\n";
+	}
+
+	cout << "First test done\n";
+
+	for (size_t i = 0; i < 5e4; ++i) {
+		if(!test(20, 15)) {
+			cout << i << "\n";
+			ASSERT_TRUE(false);
+		}
+	}
+
+	cout << "Second test done\n";
+
+	for (size_t i = 0; i < 50; ++i) {
+		if (!test(1000, 100)) {
+			cout << i << "\n";
+			ASSERT_TRUE(false);
 		}
 	}
 }
 
-TEST(auto_test, big) {
-	for (size_t i = 0; i < 30; ++i) {
-		if (!test(1000, 1e9)) {
-			cout << i << "\n";
-			ASSERT_TRUE(false);
-		}
-	}
-}
 
 int main(int argc, char **argv) {
 	::testing::InitGoogleTest(&argc, argv);

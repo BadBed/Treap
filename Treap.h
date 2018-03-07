@@ -4,351 +4,249 @@
 #include <algorithm>
 #include <cassert>
 #include <iostream>
+#include "pch.h"
 
 using std::cin;
 using std::cout;
 using std::pair;
 using std::make_pair;
+using std::swap;
 
-//####################################################################
+typedef long long lint;
 
-template <typename T>
 class CNode {
 public:
-	T key;
-	int priority;
-	CNode<T> *left, *right;
+	CNode * left;
+	CNode *right;
+	lint best_seg_size, best_seg_pos;
+	lint best_pref, best_suf;
+	bool assign_value;
+	bool is_assign;
 
-	size_t size;
-	T value, max;
-	T key_of_max;
-
-
-	CNode();
-	explicit CNode(T, T);
-	~CNode();
+	CNode() { assert(false); }
+	CNode(lint size);
+	~CNode() {}
 };
 
-template <typename T>
-class CTreap {
+//-----------------------------------------------------------------
+
+class CTree {
 private:
-	CNode<T>* root_;
+	CNode * root_;
+	lint size_;
 
-	static void DeleteNodes(CNode<T>* node);
-	static void Update(CNode<T>* node);
-	static void Push(CNode<T>* node);
+	static void Push(CNode* node, lint size);
+	static void Update(CNode* node, lint size);
+	static void InitChilds(CNode* node, lint size);
 
-	static CNode<T>* Merge(CNode<T>* first, CNode<T>* second);
-	static pair<CNode<T>*, CNode<T>* > Split(CNode<T>* root, T key);
-	static CNode<T>* Find(CNode<T>* node, T key);
-	// <k, >=k
+	static lint GetBestSize(CNode* node, lint size);
+	static lint GetBestPos(CNode* node, lint size);
+	static lint GetBestPref(CNode* node, lint size);
+	static lint GetBestSuf(CNode* node, lint size);
 
-	static size_t GetSize(const CNode<T>* node);
-	static T GetValue(const CNode<T>* node);
-	static T GetMax(const CNode<T>* node);
+	static void SetAssign(CNode* node, bool value, lint size);
+	static void Assign(bool value, lint op_l, lint op_r,
+		CNode* node, lint n_l, lint n_r);//****
 
-	static T Kth(CNode<T>* node, size_t k);
-
-	static void Print(CNode<T>* node);
+	void Assign(bool value, lint op_l, lint op_r) {
+		Assign(value, op_l, op_r, root_, 0, size_);
+	}
 
 public:
-	CTreap();
-	CTreap(const T* array, const T* end);
-	~CTreap();
+	CTree(lint size);
 
-	size_t Size() const;
+	lint BestSize() { return GetBestSize(root_, size_); }
+	lint BestPos() { return GetBestPos(root_, size_); }
 
-	void Insert(T key, T value);
-	void Delete(T key);
-	bool Exist(T key) const;
-	T Kth(size_t k) const;
-	T Max() const { return GetMax(root_); }
-	T KeyOfMax() const;
-	T Value(T key);
-	T Suc(T key);
-	T Pred(T key);
 
-	void Print();
+	void Free(lint l, lint r) { Assign(true, l, r); }
+	void Reserve(lint l, lint r) { Assign(false, l, r); }
 };
 
-//###################################################################
+//#################################################################################
 
-template <typename T>
-CNode<T>::CNode() :
-	key(0),
-	priority(rand()),
-	left(nullptr),
-	right(nullptr),
-	size(1),
-	value(0),
-	max(0),
-	key_of_max(0) { assert(false); }
-
-template <typename T>
-CNode<T>::CNode(T key, T value) :
-	key(key),
-	priority(rand()),
-	left(nullptr),
-	right(nullptr),
-	size(1),
-	value(value),
-	max(value),
-	key_of_max(key) {}
-
-template <typename T>
-CNode<T>::~CNode() {}
-
-template <typename T>
-CTreap<T>::CTreap() {
-	root_ = nullptr;
+CNode::CNode(lint size) {
+	assert(size > 0);
+	left = right = nullptr;
+	best_seg_size = best_pref = best_suf = size;
+	best_seg_pos = 0;
+	is_assign = false;
 }
 
-template <typename T>
-CTreap<T>::~CTreap() {
-	DeleteNodes(root_);
-}
+CTree::CTree(lint size) {
+	size_ = 1;
+	while (size_ <= size)
+		size_ *= 2;
 
-template <typename T>
-size_t CTreap<T>::Size() const {
-	return GetSize(root_);
-}
+	root_ = new CNode(size_);
 
-//----------------------------------------------------------------------
-
-template <typename T>
-void CTreap<T>::DeleteNodes(CNode<T>* node) {
-	if (node == nullptr)
-		return;
-
-	DeleteNodes(node->left);
-	DeleteNodes(node->right);
-	delete node;
-}
-
-template <typename T>
-size_t CTreap<T>::GetSize(const CNode<T>* node) {
-	if (node == nullptr)
-		return 0;
-	else
-		return node->size;
-}
-
-template <typename T>
-T CTreap<T>::GetValue(const CNode<T>* node) {
-	if (node == nullptr)
-		return 0;
-	else
-		return node->value;
-}
-
-template <typename T>
-T CTreap<T>::GetMax(const CNode<T>* node) {
-	if (node == nullptr)
-		return 0;
-	else
-		return node->max;
-}
-
-template <typename T>
-void CTreap<T>::Update(CNode<T>* node) {
-	if (node == nullptr)
-		return;
-
-	node->size = GetSize(node->left) + GetSize(node->right) + 1;
-
-	if (node->value > GetMax(node->left) && node->value >= GetMax(node->right)) {
-		node->max = node->value;
-		node->key_of_max = node->key;
-	}
-	else if (GetMax(node->left) >= GetMax(node->right)) {
-		node->max = GetMax(node->left);
-		node->key_of_max = node->left->key_of_max;
-	}
-	else {
-		node->max = GetMax(node->right);
-		node->key_of_max = node->right->key_of_max;
-	}
-}
-
-template <typename T>
-void CTreap<T>::Push(CNode<T>* node) {
-
-}
-
-//--------------------------------------------------------------------
-
-template <typename T>
-CTreap<T>::CTreap(const T* array, const T* end) {
-	assert(true);
-	std::vector<CNode<T>*> right_way;
-	size_t size = (size_t)(end - array);
-	if (size == 0)
-		return;
-
-	root_ = new CNode<T>(array[0]);
-	right_way.push_back(root_);
-
-	for (size_t i = 1; i < size; ++i) {
-		CNode<T>* new_node = new CNode<T>(array[i]);
-		if (right_way.back()->priority > new_node->priority) {
-			right_way.back()->right = new_node;
-		}
-		else if (root_->priority <= new_node->priority) {
-			right_way.clear();
-			right_way.push_back(new_node);
-			new_node->left = root_;
-			root_ = new_node;
-		}
-		else {
-			CNode<T>* just_popped = nullptr;
-			while (right_way.back()->priority <= new_node->priority) {
-				just_popped = right_way.back();
-				right_way.pop_back();
-			}
-			right_way.back()->right = new_node;
-			new_node->left = just_popped;
-		}
-		right_way.back();
-	}
-}
-
-template <typename T>
-CNode<T>* CTreap<T>::Merge(CNode<T>* first, CNode<T>* second) {
-	Push(first); Push(second);
-	if (first == nullptr)
-		return second;
-	if (second == nullptr)
-		return first;
-
-	if (first->priority <= second->priority) {
-		second->left = Merge(first, second->left);
-		Update(second);
-		return second;
-	}
-	else {
-		first->right = Merge(first->right, second);
-		Update(first);
-		return first;
-	}
-}
-
-template <typename T>
-pair<CNode<T>*, CNode<T>* > CTreap<T>::Split(CNode<T>* node, T key) {
-	Push(node);
-	if (node == nullptr)
-		return pair<CNode<T>*, CNode<T>* >(nullptr, nullptr);
-
-	if (key > node->key) {
-		auto p = Split(node->right, key);
-		node->right = p.first;
-		Update(node);
-		return make_pair(node, p.second);
-	}
-	else {
-		auto p = Split(node->left, key);
-		node->left = p.second;
-		Update(node);
-		return make_pair(p.first, node);
-	}
-}
-
-template <typename T>
-CNode<T>* CTreap<T>::Find(CNode<T>* node, T key) {
-	if (node == nullptr || node->key == key)
-		return node;
-
-	Push(node);
-	if (node->key > key) {
-		return Find(node->left, key);
-	}
-	else {
-		return Find(node->right, key);
-	}
+	Reserve(size, size_);
 }
 
 //--------------------------------------------------------------------------------
 
-template <typename T>
-void CTreap<T>::Insert(T key, T value) {
-	if (Exist(key))
+void CTree::InitChilds(CNode* node, lint size) {
+	assert(node != nullptr);
+	if (size == 1)
 		return;
 
-	CNode<T>* new_node = new CNode<T>(key, value);
-	auto p = Split(root_, key);
-	p.first = Merge(p.first, new_node);
-	root_ = Merge(p.first, p.second);
+	if (node->left == nullptr)
+		node->left = new CNode(size / 2);
+	if (node->right == nullptr)
+		node->right = new CNode(size / 2);
 }
 
-template <typename T>
-void CTreap<T>::Delete(T key) {
-	assert(Exist(key));
-
-	auto p = Split(root_, key);
-	auto p2 = Split(p.second, key + 1);
-	delete p2.first;
-	root_ = Merge(p.first, p2.second);
-}
-
-template <typename T>
-T CTreap<T>::Kth(size_t k) const {
-	assert(k < GetSize(root_));
-	return Kth(root_, k);
-}
-
-template <typename T>
-T CTreap<T>::Kth(CNode<T>* node, size_t k) {
-	assert(k < GetSize(node));
-	Push(node);
-	size_t size_left = GetSize(node->left);
-	if (size_left == k) {
-		return node->key;
+void CTree::Push(CNode* node, lint size) {
+	assert(node != nullptr);
+	InitChilds(node, size);
+	if (node->is_assign) {
+		InitChilds(node, size);
+		SetAssign(node->left, node->assign_value, size / 2);
+		SetAssign(node->right, node->assign_value, size / 2);
+		node->is_assign = false;
 	}
-	else if (size_left > k) {
-		return Kth(node->left, k);
+}
+
+void CTree::Update(CNode* node, lint size) {
+	assert(node != nullptr);
+
+	if (GetBestSize(node->left, size / 2) == size / 2) {
+		node->best_pref = GetBestPref(node->right, size / 2) + size / 2;
 	}
 	else {
-		return Kth(node->right, k - size_left - 1);
+		node->best_pref = GetBestPref(node->left, size / 2);
+	}
+
+	if (GetBestSize(node->right, size / 2) == size / 2) {
+		node->best_suf = GetBestSuf(node->left, size / 2) + size / 2;
+	}
+	else {
+		node->best_suf = GetBestSuf(node->right, size / 2);
+	}
+
+	if (GetBestSize(node->left, size / 2) >=
+		GetBestSuf(node->left, size / 2) + GetBestPref(node->right, size / 2)
+		&& GetBestSize(node->left, size / 2) >= GetBestSize(node->right, size / 2)) {
+		node->best_seg_size = GetBestSize(node->left, size / 2);
+		node->best_seg_pos = GetBestPos(node->left, size / 2);
+	}
+	else if (GetBestSuf(node->left, size / 2) + GetBestPref(node->right, size / 2)
+		>= GetBestSize(node->right, size / 2)) {
+		node->best_seg_size = GetBestSuf(node->left, size / 2) + GetBestPref(node->right, size / 2);
+		node->best_seg_pos = size / 2 - GetBestSuf(node->left, size / 2);
+	}
+	else {
+		node->best_seg_size = GetBestSize(node->right, size / 2);
+		node->best_seg_pos = size / 2 + GetBestPos(node->right, size / 2);
 	}
 }
 
-template <typename T>
-bool CTreap<T>::Exist(T key) const {
-	return Find(root_, key) != nullptr;
+//------------------------------------------------------------------------
+
+lint CTree::GetBestPos(CNode* node, lint size) {
+	if (node == nullptr) {
+		return 0;
+	}
+	else {
+		return node->best_seg_pos;
+	}
 }
 
-template <typename T>
-T CTreap<T>::KeyOfMax() const {
-	assert(Size() > 0);
-	return root_->key_of_max;
+lint CTree::GetBestSize(CNode* node, lint size) {
+	if (node == nullptr) {
+		return size;
+	}
+	else {
+		return node->best_seg_size;
+	}
 }
 
-//---------------------------------------------------------------------------------
-
-template <typename T>
-void CTreap<T>::Print() {
-	Print(root_);
-	cout << "\n";
+lint CTree::GetBestPref(CNode* node, lint size) {
+	if (node == nullptr) {
+		return size;
+	}
+	else {
+		return node->best_pref;
+	}
 }
 
-template <typename T>
-void CTreap<T>::Print(CNode<T>* node) {
-	if (node == nullptr)
+lint CTree::GetBestSuf(CNode* node, lint size) {
+	if (node == nullptr) {
+		return size;
+	}
+	else {
+		return node->best_suf;
+	}
+}
+
+//------------------------------------------------------------------------
+
+void CTree::SetAssign(CNode* node, bool value, lint size) {
+	node->is_assign = true;
+	node->assign_value = value;
+
+	node->best_seg_pos = 0;
+	if (node->assign_value) {
+		node->best_seg_size = node->best_pref = node->best_suf = size;
+	}
+	else {
+		node->best_seg_size = node->best_pref = node->best_suf = 0;
+	}
+}
+
+void CTree::Assign(bool value, lint op_l, lint op_r,
+	CNode* node, lint n_l, lint n_r) {
+	assert(node != nullptr);
+	if (op_l <= n_l && n_r <= op_r) {
+		SetAssign(node, value, n_r - n_l);
 		return;
+	}
 
-	Print(node->left);
-	cout << node->key << " ";
-	Print(node->right);
+	if (op_l >= n_r || n_l >= op_r) {
+		return;
+	}
+
+	Push(node, n_r - n_l);
+	lint n_m = (n_r + n_l) / 2;
+	Assign(value, op_l, op_r, node->left, n_l, n_m);
+	Assign(value, op_l, op_r, node->right, n_m, n_r);
+	Update(node, n_r - n_l);
 }
 
 //#################################################################################
 
-int solution() {
+void solution() {
+	lint n, m;
+	cin >> n >> m;
+	std::vector<lint> poses(m);
+	std::vector<lint> sizes(m);
+	CTree tree(n);
 
-
-	return 0;
+	for (lint i = 0; i < m; ++i) {
+		lint q;
+		cin >> q;
+		if (q > 0) {
+			if (tree.BestSize() >= q) {
+				lint pos = tree.BestPos();
+				cout << pos + 1 << "\n";
+				tree.Reserve(pos, pos + q);
+				poses[i] = pos;
+				sizes[i] = q;
+			}
+			else {
+				cout << "-1\n";
+			}
+		}
+		else {
+			q *= -1;
+			q--;
+			tree.Free(poses[q], poses[q] + sizes[q]);
+		}
+	}
 }
-
+/*
 int main() {
-	return solution();
+	solution();
+	system("pause");
 }
-
+*/
