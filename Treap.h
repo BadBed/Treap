@@ -6,6 +6,13 @@
 #include <iostream>
 #include "pch.h"
 
+//Delete Swap
+//Main
+//Successor
+//Next/Prev Permutation
+//Enum
+//
+
 using std::cin;
 using std::cout;
 using std::pair;
@@ -16,7 +23,7 @@ typedef unsigned int uint;
 typedef long long lint;
 
 template <typename T>
-class CNode {
+struct CNode {
 public:
 	T key;
 	int priority;
@@ -28,7 +35,7 @@ public:
 	size_t inc_suff, dec_suff;
 	size_t inc_pref, dec_pref;
 
-	CNode();
+	CNode() = delete;
 	explicit CNode(T);
 	~CNode();
 };
@@ -68,10 +75,14 @@ private:
 	static size_t GetDecSuff(const CNode<T>* node);
 	static size_t GetIncPref(const CNode<T>* node);
 	static size_t GetDecPref(const CNode<T>* node);
+	static size_t GetSegment(const CNode<T>* node, bool is_dec, bool is_suf);
+	static T GetEdge(const CNode<T>* node, bool is_leftist);
 
 	static void SetAdd(CNode<T>* node, T add);
 	static void SetAssign(CNode<T>* node, T value);
 	static void SetReverse(CNode<T>* node);
+
+	static void UpdateSegment(CNode<T>* node, bool is_dec, bool is_suf);
 
 	static int SucInDec(CNode<T>* node, T value);
 	static int PredInInc(CNode<T>* node, T value);
@@ -112,11 +123,6 @@ public:
 };
 
 //###################################################################
-
-template <typename T>
-CNode<T>::CNode(){
-	assert(false);
-}
 
 template <typename T>
 CNode<T>::CNode(T key):
@@ -198,44 +204,39 @@ void CTreap<T>::Update (CNode<T>* node) {
 	node->leftist = node->left == nullptr ? node->key : node->left->leftist;
 	node->rightist = node->right == nullptr ? node->key : node->right->rightist;
 
-	if (node->right == nullptr || (node->key <= node->right->leftist &&
-				node->right->inc_suff == node->right->size)) {
-		node->inc_suff = GetSize(node->right) + 1;
-		if (node->left != nullptr && node->left->rightist <= node->key)
-			node->inc_suff += node->left->inc_suff;
+	UpdateSegment(node, false, false);
+	UpdateSegment(node, false, true);
+	UpdateSegment(node, true, false);
+	UpdateSegment(node, true, true);
+}
+
+template <typename T>
+void CTreap<T>::UpdateSegment(CNode<T>* node, bool is_dec, bool is_suf) {
+	CNode<T>* first = is_suf ? node->right : node->left;
+	CNode<T>* second = is_suf ? node->left : node->right;
+	size_t result;
+
+	if (first == nullptr || (node->key <= GetEdge(first, is_suf) &&
+				GetSegment(first, is_dec, is_suf) == GetSize(node))) {
+		result = GetSize(first) + 1;
+		if (second != nullptr && GetEdge(second, !is_suf) <= node->key)
+			result += GetSegment(second, is_dec, is_suf);
 	}
 	else {
-		node->inc_suff = GetIncSuff(node->right);
+		result = GetSegment(second, is_dec, is_suf);
 	}
 
-	if (node->right == nullptr || (node->key >= node->right->leftist &&
-				node->right->dec_suff == node->right->size)) {
-		node->dec_suff = GetSize(node->right) + 1;
-		if (node->left != nullptr && node->left->rightist >= node->key)
-			node->dec_suff += node->left->dec_suff;
+	if (is_dec && is_suf) {
+		node->dec_suff = result;
 	}
-	else {
-		node->dec_suff = GetDecSuff(node->right);
+	else if (is_dec && !is_suf) {
+		node->dec_pref = result;
 	}
-
-	if (node->left == nullptr || (node->key >= node->left->rightist &&
-				node->left->inc_pref == node->left->size)) {
-		node->inc_pref = GetSize(node->left) + 1;
-		if (node->right != nullptr && node->right->leftist >= node->key)
-			node->inc_pref += node->right->inc_pref;
+	else if (!is_dec && is_suf) {
+		node->inc_suff = result;
 	}
-	else {
-		node->inc_pref = GetIncPref(node->left);
-	}
-
-	if (node->left == nullptr || (node->key <= node->left->rightist &&
-				node->left->dec_pref == node->left->size)) {
-		node->dec_pref = GetSize(node->left) + 1;
-		if (node->right != nullptr && node->right->leftist <= node->key)
-			node->dec_pref += node->right->dec_pref;
-	}
-	else {
-		node->dec_pref = GetDecPref(node->left);
+	else if (!is_dec && !is_suf) {
+		node->inc_pref = result;
 	}
 }
 
@@ -313,6 +314,37 @@ T CTreap<T>::GetSum (const CNode<T>* node) {
 		return node->sum;
 }
 
+template <typename T>
+size_t CTreap<T>::GetSegment(const CNode<T>* node, bool is_dec, bool is_suf) {
+	if (is_dec && is_suf) {
+		return GetDecSuff(node);
+	}
+	else if (is_dec && !is_suf) {
+		return GetDecPref(node);
+	}
+	else if (!is_dec && is_suf) {
+		return GetIncSuff(node);
+	}
+	else if (!is_dec && !is_suf) {
+		return GetIncPref(node);
+	}
+	else {
+		assert(false);
+	}
+}
+
+template <typename T>
+T CTreap<T>::GetEdge(const CNode<T>* node, bool is_leftist) {
+	assert(node != nullptr);
+
+	if (is_leftist) {
+		return node->leftist;
+	}
+	else {
+		return node->rightist;
+	}
+}
+
 //---------------------------------------------------------------------
 
 template <typename T>
@@ -359,7 +391,7 @@ void CTreap<T>::SetReverse (CNode<T>* node) {
 	swap(node->leftist, node->rightist);
 	swap(node->inc_pref, node->dec_suff);
 	swap(node->inc_suff, node->dec_pref);
-	node->is_reverse = node->is_reverse ? false : true;
+	node->is_reverse = !node->is_reverse;
 }
 
 //-------------------------------------------------------------------
@@ -394,17 +426,6 @@ int CTreap<T>::PredInInc(CNode<T>* node, T value) {
 	else {
 		return PredInInc(node->right, value) + 1 + GetSize(node->left);
 	}
-}
-
-template <typename T>
-void CTreap<T>::Swap(size_t pos1, size_t pos2) {
-	T key1 = operator[](pos1);
-	T key2 = operator[](pos2);
-
-	Delete(pos1);
-	Insert(key2, pos1);
-	Delete(pos2);
-	Insert(key1, pos2);
 }
 
 //--------------------------------------------------------------------
@@ -695,8 +716,8 @@ void solution() {
 	}
 	treap.Print();
 }
-
+/*
 int main() {
 	solution();
 	system("pause");
-}
+}*/
